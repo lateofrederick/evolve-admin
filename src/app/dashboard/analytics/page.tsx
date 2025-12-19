@@ -1,88 +1,109 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Legend } from "recharts"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Users, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
+import { DashboardStats } from "@/types"
+import { fetchClient } from "@/lib/api"
 
-const VISIT_DATA = [
-  { day: "Mon", scheduled: 45, completed: 44, missed: 1 },
-  { day: "Tue", scheduled: 50, completed: 50, missed: 0 },
-  { day: "Wed", scheduled: 48, completed: 47, missed: 1 },
-  { day: "Thu", scheduled: 52, completed: 52, missed: 0 },
-  { day: "Fri", scheduled: 55, completed: 54, missed: 1 },
-  { day: "Sat", scheduled: 30, completed: 30, missed: 0 },
-  { day: "Sun", scheduled: 32, completed: 32, missed: 0 },
-]
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
 
-const EFFICIENCY_DATA = [
-    { name: "Week 1", travel: 20, care: 80 },
-    { name: "Week 2", travel: 18, care: 82 },
-    { name: "Week 3", travel: 15, care: 85 }, // Improved efficiency
-    { name: "Week 4", travel: 14, care: 86 },
-]
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const data = await fetchClient<DashboardStats>('/analytics/dashboard')
+        setStats(data)
+      } catch (error) {
+        console.error("Failed to load stats", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadStats()
+  }, [])
 
-export default function AnalyticsPage() {
+  if (loading) {
+    return <div className="p-8">Loading dashboard...</div>
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Analytics & Insights</h2>
-        <Select defaultValue="7d">
-            <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Period" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-                <SelectItem value="90d">Last Quarter</SelectItem>
-            </SelectContent>
-        </Select>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-muted-foreground">Overview of today's care operations.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-
-        {/* Main Chart: Visits Trend */}
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Visit Fulfillment</CardTitle>
-            <CardDescription>Scheduled vs. Completed visits over the last 7 days.</CardDescription>
+      {/* Stats Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Visits</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={VISIT_DATA}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="day" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="scheduled" stroke="#8884d8" strokeWidth={2} activeDot={{ r: 8 }} />
-                        <Line type="monotone" dataKey="completed" stroke="#82ca9d" strokeWidth={2} />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.active_visits || 0}</div>
+            <p className="text-xs text-muted-foreground">Visits currently in progress</p>
           </CardContent>
         </Card>
 
-        {/* Efficiency Chart */}
-        <Card className="col-span-3">
-            <CardHeader>
-                <CardTitle>Operational Efficiency</CardTitle>
-                <CardDescription>Care Contact Time vs. Travel Time (%)</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={EFFICIENCY_DATA}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" fontSize={12} />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="care" stackId="a" fill="#4ade80" name="Care Time %" />
-                            <Bar dataKey="travel" stackId="a" fill="#f87171" name="Travel Time %" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </CardContent>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Staff Active</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.staff_online || 0}</div>
+            <p className="text-xs text-muted-foreground">Carers marked as available</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-amber-500">Alerts</CardTitle>
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-500">{stats?.recent_alerts.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Compliance</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.compliance_score || 0}%</div>
+            <p className="text-xs text-muted-foreground">Visit completion rate</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Alerts List */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="space-y-4">
+                {stats?.recent_alerts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No recent alerts.</p>
+                ) : (
+                    stats?.recent_alerts.map((alert, k) => (
+                        <div key={k} className="flex items-center">
+                            <div className="ml-4 space-y-1">
+                                <p className="text-sm font-medium leading-none">{alert}</p>
+                                <p className="text-sm text-muted-foreground">Just now</p>
+                            </div>
+                        </div>
+                    ))
+                )}
+             </div>
+          </CardContent>
         </Card>
       </div>
     </div>
