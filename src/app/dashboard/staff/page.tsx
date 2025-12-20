@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -8,20 +8,34 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Plus, MoreHorizontal, FileWarning } from "lucide-react"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-
-// Mock Data with "Compliance Status" logic
-const STAFF_DATA = [
-  { id: 1, name: "Sarah Jenkins", role: "Senior Carer", email: "sarah.j@careflow.com", status: "Active", compliance: "Valid", lastTraining: "2023-11-15" },
-  { id: 2, name: "Michael Thompson", role: "Carer", email: "m.thompson@careflow.com", status: "Active", compliance: "Expiring Soon", lastTraining: "2023-01-10" },
-  { id: 3, name: "Emma Wilson", role: "Trainee", email: "emma.w@careflow.com", status: "Onboarding", compliance: "Missing Docs", lastTraining: "N/A" },
-]
+import { Search, Plus, MoreHorizontal } from "lucide-react"
+import { fetchClient } from "@/lib/api"
+import { StaffProfile } from "@/types"
 
 export default function StaffPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [staffList, setStaffList] = useState<StaffProfile[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadStaff() {
+      try {
+        const data = await fetchClient<StaffProfile[]>('/staff') // Calls backend
+        setStaffList(data)
+      } catch (error) {
+        console.error("Failed to fetch staff", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadStaff()
+  }, [])
+
+  // Basic client-side search filtering
+  const filteredStaff = staffList.filter(staff =>
+    staff.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    staff.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">
@@ -55,52 +69,43 @@ export default function StaffPage() {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Compliance</TableHead>
-              <TableHead>Last Training</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {STAFF_DATA.map((staff) => (
+            {loading ? (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10">Loading Staff...</TableCell>
+                </TableRow>
+            ) : filteredStaff.map((staff) => (
               <TableRow key={staff.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={`/avatars/${staff.id}.png`} alt={staff.name} />
-                      <AvatarFallback>{staff.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      <AvatarImage src={`/avatars/${staff.id}.png`} />
+                      <AvatarFallback>{staff.user.full_name.substring(0,2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                        <span>{staff.name}</span>
-                        <span className="text-xs text-muted-foreground">{staff.email}</span>
+                        <span>{staff.user.full_name}</span>
+                        <span className="text-xs text-muted-foreground">{staff.user.email}</span>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{staff.role}</TableCell>
+                <TableCell>{staff.job_title}</TableCell>
                 <TableCell>
-                    <Badge variant={staff.status === 'Active' ? 'default' : 'secondary'}>
-                        {staff.status}
+                    <Badge variant={staff.user.is_active ? 'default' : 'secondary'}>
+                        {staff.user.is_active ? 'Active' : 'Inactive'}
                     </Badge>
                 </TableCell>
                 <TableCell>
-                    {staff.compliance === 'Valid' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Compliant</Badge>}
-                    {staff.compliance === 'Expiring Soon' && <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">DBS Expiring</Badge>}
-                    {staff.compliance === 'Missing Docs' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">Missing Docs</Badge>}
+                    {staff.compliance_status === 'compliant' && <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Compliant</Badge>}
+                    {staff.compliance_status === 'warning' && <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">Expiring Soon</Badge>}
+                    {staff.compliance_status === 'non_compliant' && <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">Missing Docs</Badge>}
                 </TableCell>
-                <TableCell>{staff.lastTraining}</TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Details</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">Suspend</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
