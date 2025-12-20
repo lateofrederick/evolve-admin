@@ -1,129 +1,122 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+import { fetchClient } from "@/lib/api"
+import { Client } from "@/types"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Phone, AlertTriangle, FileText, Pill, History, Table } from "lucide-react"
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Printer, Loader2 } from "lucide-react"
+import QRCode from "react-qr-code"
+
+// Extended type for this view
+interface CarePlan {
+  morning_routine: string;
+  lunch_routine: string;
+}
 
 export default function ClientProfilePage() {
+  const { id } = useParams()
+  const [client, setClient] = useState<Client | null>(null)
+  const [carePlan, setCarePlan] = useState<CarePlan | null>(null)
+  const [qrPayload, setQrPayload] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Parallel fetch
+        const [clientData, planData, qrData] = await Promise.all([
+          fetchClient<Client>(`/clients?id=${id}`).then(res => (Array.isArray(res) ? res.find(c => c.id === Number(id)) : res)), // Simple find as mock /clients endpoint returns all
+          fetchClient<CarePlan>(`/clients/${id}/care-plan`),
+          fetchClient<{qr_payload: string}>(`/clients/${id}/qr`)
+        ])
+
+        setClient(clientData as Client)
+        setCarePlan(planData)
+        setQrPayload(qrData.qr_payload)
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [id])
+
+  if (loading || !client) return <div className="p-8"><Loader2 className="animate-spin" /></div>
+
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl font-bold text-slate-600">
-                ES
+                {client.first_name[0]}{client.last_name[0]}
             </div>
             <div>
-                <h2 className="text-3xl font-bold tracking-tight">Eleanor Smith</h2>
-                <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>12 Oak Lane, Derby, DE22 1AB</span>
-                    <Badge variant="outline" className="ml-2">Key Safe: 1452</Badge>
+                <h2 className="text-3xl font-bold tracking-tight">{client.first_name} {client.last_name}</h2>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                    <span>{client.address_line_1}, {client.post_code}</span>
                 </div>
             </div>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline"><History className="mr-2 h-4 w-4"/> View Audit Logs</Button>
-            <Button>Edit Care Plan</Button>
-        </div>
       </div>
 
-      {/* Critical Alerts Banner */}
-      <div className="bg-red-50 border border-red-200 rounded-md p-4 flex gap-3 items-start">
-        <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-        <div>
-            <h4 className="font-semibold text-red-900">Critical Alerts</h4>
-            <p className="text-sm text-red-800">
-                • DNACPR in place (Red Folder on Fridge).<br/>
-                • Severe allergy to Penicillin.<br/>
-                • Two-person assist required for all transfers.
-            </p>
-        </div>
-      </div>
-
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="care-plan" className="space-y-4">
+      <Tabs defaultValue="care-plan">
         <TabsList>
           <TabsTrigger value="care-plan">Care Plan</TabsTrigger>
-          <TabsTrigger value="medication">Medication (eMAR)</TabsTrigger>
-          <TabsTrigger value="risks">Risk Assessments</TabsTrigger>
-          <TabsTrigger value="history">Visit History</TabsTrigger>
+          <TabsTrigger value="access">Access & QR</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Care Plan */}
         <TabsContent value="care-plan" className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5"/> Morning Routine (08:00 - 09:00)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="border-l-4 border-blue-500 pl-4 py-1">
-                            <p className="font-semibold">Personal Care</p>
-                            <p className="text-sm text-muted-foreground">Assist with strip wash at sink. Client prefers warm water and lavender soap.</p>
+            <Card>
+                <CardHeader><CardTitle>Morning Routine</CardTitle></CardHeader>
+                <CardContent>{carePlan?.morning_routine || "No details"}</CardContent>
+            </Card>
+            <Card>
+                <CardHeader><CardTitle>Lunch Routine</CardTitle></CardHeader>
+                <CardContent>{carePlan?.lunch_routine || "No details"}</CardContent>
+            </Card>
+        </TabsContent>
+
+        <TabsContent value="access" className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-8">
+                {/* QR Card */}
+                <Card className="border-2 border-dashed">
+                    <CardContent className="flex flex-col items-center pt-6 text-center">
+                        <div className="bg-white p-4 rounded-lg border shadow-sm mb-4">
+                            <QRCode value={qrPayload} size={150} />
                         </div>
-                        <div className="border-l-4 border-green-500 pl-4 py-1">
-                            <p className="font-semibold">Nutrition</p>
-                            <p className="text-sm text-muted-foreground">Prepare porridge with honey. Ensure fluids are thickened (Level 2).</p>
-                        </div>
+                        <h3 className="font-bold text-lg">{client.first_name} {client.last_name}</h3>
+                        <p className="text-xs text-muted-foreground mb-4">ID: {client.id} • Official Check-in Point</p>
+                        <Button variant="outline" onClick={() => window.print()}>
+                            <Printer className="mr-2 h-4 w-4" /> Print Card
+                        </Button>
                     </CardContent>
                 </Card>
 
+                {/* Info */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5"/> Lunch Routine (12:30 - 13:00)
-                        </CardTitle>
-                    </CardHeader>
+                    <CardHeader><CardTitle>Access Details</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="border-l-4 border-green-500 pl-4 py-1">
-                            <p className="font-semibold">Nutrition</p>
-                            <p className="text-sm text-muted-foreground">Heat up delivered meal (Wiltshire Farm Foods). Ensure client is sitting upright.</p>
+                        <div className="p-4 bg-slate-50 rounded-md">
+                            <p className="text-sm font-medium text-slate-500">Key Safe Code</p>
+                            <p className="text-2xl font-mono tracking-widest">4590</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-md">
+                            <p className="text-sm font-medium text-slate-500">Location</p>
+                            <p className="text-sm">
+                                Lat: {Number(0).toFixed(6)} <br/>
+                                Long: {Number(0).toFixed(6)}
+                            </p>
+                            <Badge variant="outline" className="mt-2">Geofence Active</Badge>
                         </div>
                     </CardContent>
                 </Card>
             </div>
-        </TabsContent>
-
-        {/* Tab 2: Medication */}
-        <TabsContent value="medication">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Pill className="h-5 w-5"/> Active Medication
-                    </CardTitle>
-                    <CardDescription>Last reviewed by GP: 01/12/2025</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Medication</TableHead>
-                                <TableHead>Dosage</TableHead>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Instructions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="font-medium">Paracetamol</TableCell>
-                                <TableCell>500mg (2 tablets)</TableCell>
-                                <TableCell><Badge>Morning</Badge> <Badge>Evening</Badge></TableCell>
-                                <TableCell>Take with food.</TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell className="font-medium">Amlodipine</TableCell>
-                                <TableCell>5mg</TableCell>
-                                <TableCell><Badge>Morning</Badge></TableCell>
-                                <TableCell>Monitor BP weekly.</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
         </TabsContent>
       </Tabs>
     </div>
